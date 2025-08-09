@@ -1,70 +1,68 @@
 export interface Env {
   TOKENS: KVNamespace;                   // KV with token -> {"tag": number}
-  APP_SCRIPT_URL: string;                // e.g. https://script.google.com/macros/s/XXXXX/exec
-  VALID_GROUPS: string;                  // e.g. "G1,G2,...,G30"
   BONUS_EXTRA_SCROLL?: string;           // e.g. "1,14"
   BONUS_MULTI_TAP?: string;              // e.g. "10,11"
-  COOLDOWN_SECONDS?: string;             // e.g. "5"  (fast duplicate-scan window)
-  BONUS_TTL_SECONDS?: string;            // e.g. "21600" (6h) lifetime to remember a claimed bonus
+  COOLDOWN_SECONDS?: string;             // e.g. "5"
+  BONUS_TTL_SECONDS?: string;            // e.g. "21600" (6h)
 }
 
 export const onRequest: PagesFunction<Env> = async ({ params, env, request }) => {
   const token = String(params.token || "").trim();
   const reqUrl = new URL(request.url);
   const q = reqUrl.searchParams;
-  const bonusParam = (q.get("bonus") || "").trim(); // set by bonus pages on return
+  const bonusParam = (q.get("bonus") || "").trim();
 
-  // 0) Lookup tag for this token
+  // 0) Lookup tag number for this token
   const record = await env.TOKENS.get(token, "json") as { tag: number } | null;
   if (!record) return html(404, simplePage("Invalid tag", "<p>This tag isn’t recognised.</p>"));
   const tag = record.tag;
 
-  // Parse env config
-  const validGroups = (env.VALID_GROUPS || "")
-    .split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+  // Parse bonus config
   const scrollBonus = parseCsvNums(env.BONUS_EXTRA_SCROLL);
   const multiBonus  = parseCsvNums(env.BONUS_MULTI_TAP);
   const cooldownSec = toInt(env.COOLDOWN_SECONDS, 5);
-  const bonusTtlSec = toInt(env.BONUS_TTL_SECONDS, 21600); // 6h default
+  const bonusTtlSec = toInt(env.BONUS_TTL_SECONDS, 21600);
 
-  // 1) Group handling (query OR inline capture form). We never hardcode Apps Script URL in HTML.
-  const groupParam = (q.get("group") || "").trim();
+  // Load routes.json and links.json
+  const origin = new URL(request.url).origin;
+  const [routes, links] = await Promise.all([
+    fetch(`${origin}/data/routes.json`).then(r => r.json()),
+    fetch(`${origin}/data/links.json`).then(r => r.json())
+  ]);
+
+  // 1) Group handling
+  const groupParam = (q.get("group") || "").trim().toUpperCase();
   if (!groupParam) {
-    // Inline capture page: validates before storing, uppercases, and jumps straight to clue/bonus.
     return html(200, captureFormPage({
-      token, tag, appUrl: env.APP_SCRIPT_URL,
+      token, tag,
       isScrollBonus: scrollBonus.includes(tag),
       isMultiBonus:  multiBonus.includes(tag),
-      validGroups
+      validGroups: Object.keys(routes)
     }));
   }
 
-  // 2) Validate group (uppercase + check list)
-  const group = groupParam.toUpperCase();
-  if (!validGroups.includes(group)) {
+  const group = groupParam;
+  if (!routes[group]) {
     return html(400, invalidGroupPage());
   }
 
-  // 3) Duplicate-scan cooldown (non-bonus triggers only)
-  // Use KV as a short TTL semaphore: RL:<group>:<token>
+  // 2) Duplicate-scan cooldown
   let dup = "0";
   if (!bonusParam) {
     const rlKey = `RL:${group}:${token}`;
     const hit = await env.TOKENS.get(rlKey);
     if (hit) {
-      // Recently scanned; mark as duplicate so Apps Script can de-weight or ignore
       dup = "1";
     } else {
       await env.TOKENS.put(rlKey, "1", { expirationTtl: cooldownSec });
     }
   }
 
-  // 4) Bonus trigger routing (only when not returning from a bonus completion)
+  // 3) Bonus trigger routing
   if (!bonusParam) {
     if (scrollBonus.includes(tag)) {
       const u = new URL("/bonus/bonus1", reqUrl.origin);
       u.searchParams.set("group", group);
-      // pass the token so bonus can return via /checkpoint/{token}
       u.searchParams.set("tag", token);
       return Response.redirect(u.toString(), 302);
     }
@@ -76,32 +74,39 @@ export const onRequest: PagesFunction<Env> = async ({ params, env, request }) =>
     }
   }
 
-  // 5) Bonus completion anti-abuse
-  // If returning with ?bonus=..., ensure award once per (group, tag, bonusType)
+  // 4) Bonus completion once-only check
   let repeat = "0";
   if (bonusParam) {
     const bKey = `BONUS:${group}:${tag}:${bonusParam}`;
     const already = await env.TOKENS.get(bKey);
     if (already) {
-      repeat = "1"; // Apps Script can ignore additional awards
+      repeat = "1";
     } else {
       await env.TOKENS.put(bKey, "1", { expirationTtl: bonusTtlSec });
     }
   }
 
-  // 6) Normal (or bonus completion) redirect to Google Apps Script
-  const scriptUrl = new URL(env.APP_SCRIPT_URL);
-  scriptUrl.searchParams.set("group", group);
-  scriptUrl.searchParams.set("tag", String(tag));
-  if (bonusParam) scriptUrl.searchParams.set("bonus", bonusParam);
-  if (dup === "1") scriptUrl.searchParams.set("dup", "1");
-  if (repeat === "1") scriptUrl.searchParams.set("repeat", "1");
+  // 5) Route checking
+  const route = routes[group];
+  const tagIndex = route.indexOf(tag);
+  if (tagIndex === -1) {
+    return html(400, simplePage("Tag Not in Route", `<p>Tag ${tag} is not part of ${group}’s route.</p>`));
+  }
 
-  return Response.redirect(scriptUrl.toString(), 302);
+  // 6) Get clue URL
+  const clueUrl = links[tag];
+  if (!clueUrl) {
+    return html(400, simplePage("Missing Clue", `<p>No clue found for tag ${tag}.</p>`));
+  }
+
+  // 7) Redirect to clue
+  const finalUrl = new URL(clueUrl);
+  if (dup === "1") finalUrl.searchParams.set("dup", "1");
+  if (repeat === "1") finalUrl.searchParams.set("repeat", "1");
+  return Response.redirect(finalUrl.toString(), 302);
 };
 
 /* ----------------- helpers ----------------- */
-
 function parseCsvNums(v?: string) {
   return (v || "").split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
 }
@@ -132,54 +137,39 @@ function invalidGroupPage() {
     <script>
       document.getElementById('change').addEventListener('click', function(){
         try { localStorage.removeItem('treasure_group'); } catch(e) {}
-        // Reload without query so we see the capture form
         location.href = location.pathname;
       });
     </script>
   `);
 }
-
 function captureFormPage(opts: {
-  token: string; tag: number; appUrl: string;
+  token: string; tag: number;
   isScrollBonus: boolean; isMultiBonus: boolean;
   validGroups: string[];
 }) {
-  const { token, tag, appUrl, isScrollBonus, isMultiBonus, validGroups } = opts;
-  // Inject minimal page that validates BEFORE saving, then jumps straight to next step.
+  const { token, tag, isScrollBonus, isMultiBonus, validGroups } = opts;
   return `<!doctype html><html><head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Enter Group</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head><body class="wrap center">
   <h2>Enter your Group ID</h2>
-  <p class="note">Example: G1, G2, …</p>
-  <form id="gform" autocomplete="off">
-    <input id="ginput" placeholder="e.g. G1" required
-           style="width:100%;padding:.6rem;border:1px solid #dadce0;border-radius:8px">
-    <div style="height:12px"></div>
+  <form id="gform">
+    <input id="ginput" placeholder="e.g. G1" required>
+    <p id="err" style="color:red;display:none">Invalid Group ID</p>
     <button class="btn" type="submit">Continue</button>
-    <p id="err" style="color:#d93025;display:none;margin-top:8px">That Group ID isn’t on the list. Check your letter/number.</p>
   </form>
   <script>
     (function(){
       var token = ${JSON.stringify(token)};
       var tag = ${JSON.stringify(tag)};
-      var app = ${JSON.stringify(appUrl)};
       var isScroll = ${JSON.stringify(isScrollBonus)};
       var isMulti  = ${JSON.stringify(isMultiBonus)};
       var valid = ${JSON.stringify(validGroups)};
-
-      // If group already saved, validate and go immediately
-      try {
-        var saved = localStorage.getItem('treasure_group');
-        if (saved) {
-          var g = (saved + "").trim().toUpperCase();
-          if (valid.indexOf(g) >= 0) { return goNext(g); }
-          // else purge bad saved value
-          localStorage.removeItem('treasure_group');
-        }
-      } catch(e){}
-
+      var saved = localStorage.getItem('treasure_group');
+      if (saved && valid.indexOf(saved.toUpperCase()) >= 0) {
+        goNext(saved.toUpperCase());
+      }
       document.getElementById('gform').addEventListener('submit', function(e){
         e.preventDefault();
         var g = document.getElementById('ginput').value.trim().toUpperCase();
@@ -187,16 +177,14 @@ function captureFormPage(opts: {
           document.getElementById('err').style.display = 'block';
           return;
         }
-        try { localStorage.setItem('treasure_group', g); } catch(e){}
+        localStorage.setItem('treasure_group', g);
         goNext(g);
       });
-
       function goNext(group){
-        // Bonus triggers first
         if (isScroll) {
           var u = new URL("/bonus/bonus1", location.origin);
           u.searchParams.set("group", group);
-          u.searchParams.set("tag", token); // pass token so bonus can return to /checkpoint/{token}
+          u.searchParams.set("tag", token);
           location.replace(u.toString()); return;
         }
         if (isMulti) {
@@ -205,17 +193,16 @@ function captureFormPage(opts: {
           u.searchParams.set("tag", token);
           location.replace(u.toString()); return;
         }
-        // Normal clue
-        var u = new URL(app);
+        var u = new URL(location.origin + "/checkpoint/" + token);
         u.searchParams.set("group", group);
-        u.searchParams.set("tag", String(tag));
         location.replace(u.toString());
       }
     })();
   </script>
 </body></html>`;
 }
-
 function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return s.replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 }
