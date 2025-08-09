@@ -1,37 +1,52 @@
 export interface Env {
   TOKENS: KVNamespace;
-  APP_SCRIPT_URL: string;
-  BONUS_EXTRA_SCROLL?: string;
-  BONUS_MULTI_TAP?: string;
+  APP_SCRIPT_URL: string; // e.g., https://script.google.com/macros/s/XXXXX/exec
+  BONUS_EXTRA_SCROLL?: string; // comma-separated tag numbers, e.g., "1,14"
+  BONUS_MULTI_TAP?: string;    // comma-separated tag numbers, e.g., "10,11"
 }
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
   const { params, env, request } = ctx;
   const token = String(params.token || "").trim();
 
-  // Look up token in KV
-  const record = await env.TOKENS.get(token, "json") as {group:string; tag:number} | null;
-  if (!record) return new Response("Invalid token", { status: 404 });
-
-  const { group, tag } = record;
-  const extra = (env.BONUS_EXTRA_SCROLL || "").split(",").map(n => parseInt(n,10));
-  const multi = (env.BONUS_MULTI_TAP || "").split(",").map(n => parseInt(n,10));
-
-  // Bonus redirect logic
-  if (extra.includes(tag)) {
-    const url = new URL(`/bonus/bonus1.html`, new URL(request.url).origin);
-    url.searchParams.set("group", group);
-    url.searchParams.set("tag", String(tag));
-    return Response.redirect(url.toString(), 302);
-  }
-  if (multi.includes(tag)) {
-    const url = new URL(`/bonus/bonus2.html`, new URL(request.url).origin);
-    url.searchParams.set("group", group);
-    url.searchParams.set("tag", String(tag));
-    return Response.redirect(url.toString(), 302);
+  // 1. Look up token in KV — should return { tag: number }
+  const record = await env.TOKENS.get(token, "json") as { tag: number } | null;
+  if (!record) {
+    return new Response("Invalid token", { status: 404 });
   }
 
-  // Normal tag → redirect to Apps Script
+  const { tag } = record;
+
+  // 2. Get group from URL
+  const urlObj = new URL(request.url);
+  const group = urlObj.searchParams.get("group") || "UNKNOWN";
+
+  // 3. Parse bonus tag arrays from env
+  const bonusScroll = (env.BONUS_EXTRA_SCROLL || "")
+    .split(",")
+    .map(n => parseInt(n.trim(), 10))
+    .filter(n => !isNaN(n));
+
+  const bonusMultiTap = (env.BONUS_MULTI_TAP || "")
+    .split(",")
+    .map(n => parseInt(n.trim(), 10))
+    .filter(n => !isNaN(n));
+
+  // 4. Bonus redirect logic
+  if (bonusScroll.includes(tag)) {
+    const bonusUrl = new URL(`/bonus/bonus1.html`, new URL(request.url).origin);
+    bonusUrl.searchParams.set("group", group);
+    bonusUrl.searchParams.set("tag", String(tag));
+    return Response.redirect(bonusUrl.toString(), 302);
+  }
+  if (bonusMultiTap.includes(tag)) {
+    const bonusUrl = new URL(`/bonus/bonus2.html`, new URL(request.url).origin);
+    bonusUrl.searchParams.set("group", group);
+    bonusUrl.searchParams.set("tag", String(tag));
+    return Response.redirect(bonusUrl.toString(), 302);
+  }
+
+  // 5. Normal tag → redirect to Google Apps Script
   const scriptUrl = new URL(env.APP_SCRIPT_URL);
   scriptUrl.searchParams.set("group", group);
   scriptUrl.searchParams.set("tag", String(tag));
