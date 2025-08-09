@@ -14,7 +14,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   if (!record) return new Response("Invalid token", { status: 404 });
 
   const urlParams = new URL(request.url).searchParams;
-  let group = urlParams.get("group") || localStorageGroup();
+  let group = urlParams.get("group") || null;
 
   // If no group stored, show form
   if (!group) {
@@ -26,9 +26,9 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   // Force uppercase to avoid case mismatches
   group = group.trim().toUpperCase();
 
-  // Store uppercase group in localStorage via inline JS on the page
-  if (!urlParams.get("group")) {
-    return new Response(storeGroupAndRedirect(group, token), {
+  // If Google Script says group is invalid, show change group page
+  if (!isValidGroupFormat(group)) {
+    return new Response(renderInvalidGroupPage(token), {
       headers: { "content-type": "text/html;charset=UTF-8" }
     });
   }
@@ -52,7 +52,8 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   return Response.redirect(scriptUrl.toString(), 302);
 };
 
-// Helper: Render group form
+// ----------------- Helper Functions -----------------
+
 function renderGroupForm(token: string) {
   return `
 <!DOCTYPE html>
@@ -61,4 +62,53 @@ function renderGroupForm(token: string) {
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Enter Group ID</title>
-<link rel="stylesheet"
+<link rel="stylesheet" href="/assets/css/style.css" />
+</head>
+<body>
+  <h2>Enter Your Group ID</h2>
+  <form id="groupForm">
+    <input type="text" id="groupId" placeholder="e.g. G1" required />
+    <button type="submit">Start</button>
+  </form>
+  <script>
+    document.getElementById('groupForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      let group = document.getElementById('groupId').value.trim().toUpperCase();
+      localStorage.setItem('treasure_group', group);
+      location.href = location.pathname + "?group=" + encodeURIComponent(group);
+    });
+  </script>
+</body>
+</html>
+`;
+}
+
+function renderInvalidGroupPage(token: string) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Invalid Group</title>
+<link rel="stylesheet" href="/assets/css/style.css" />
+</head>
+<body>
+  <h2>⚠️ Group Not Found</h2>
+  <p>The Group ID you entered does not match any group.</p>
+  <button id="changeGroup">Change Group</button>
+  <script>
+    document.getElementById('changeGroup').addEventListener('click', function() {
+      localStorage.removeItem('treasure_group');
+      location.href = location.pathname; // reload without group param
+    });
+  </script>
+</body>
+</html>
+`;
+}
+
+// Simple group ID format checker (you can make stricter if needed)
+function isValidGroupFormat(group: string) {
+  return /^G\d+$/i.test(group);
+}
