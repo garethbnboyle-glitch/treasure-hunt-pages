@@ -1,0 +1,9 @@
+body { font-family: Roboto, Arial, sans-serif; margin: 2rem; color: #202124; }
+.wrap { max-width: 520px; margin: 0 auto; }
+.center { text-align: center; }
+.btn, button {
+  display:inline-block; font-size:1rem; padding:.7rem 1rem;
+  background:#1a73e8; color:#fff; border:none; border-radius:8px;
+  cursor:pointer; text-decoration:none;
+}
+.btn:hover, button:hover { background:#1557b0; }
