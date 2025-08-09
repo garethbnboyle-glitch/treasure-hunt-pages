@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explorer’s Reward</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="wrap center">
+  <h2>Keep scrolling…</h2>
+  <div style="height:2000px"></div>
+  <a id="claim" class="btn">🎉 Claim Bonus</a>
+  <script>
+    const p = new URLSearchParams(location.search);
+    const group = p.get('group'); const tag = p.get('tag');
+    const app = "{{APP_SCRIPT_URL}}"; // replace manually or via env
+    const url = new URL(app || "https://script.google.com/macros/s/AKfycbwoPeHmGpSTOAu6tW0G6dpMBFaW8W14DS1F0Yn934UnjV1rr1QYMHxS0xMxUaXxc9MAMg/exec");
+    url.searchParams.set("group", group);
+    url.searchParams.set("tag", tag);
+    url.searchParams.set("bonus", "scroll");
+    claim.onclick = () => location.href = url.toString();
+  </script>
+</body>
+</html>
