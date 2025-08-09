@@ -8,21 +8,20 @@
 </head>
 <body class="wrap center">
   <h2>Tap 3 times to claim bonus!</h2>
-  <button id="tap" class="btn">Tap me</button>
+  <button id="tap" type="button" class="btn">Tap me</button>
   <script>
-    let taps = 0, need = 3;
-    const p = new URLSearchParams(location.search);
-    const group = p.get('group'); const tag = p.get('tag');
-    const app = "https://script.google.com/macros/s/AKfycbwoPeHmGpSTOAu6tW0G6dpMBFaW8W14DS1F0Yn934UnjV1rr1QYMHxS0xMxUaXxc9MAMg/exec";
-    tap.onclick = () => {
+    let taps = 0;
+    const need = 3;
+    const params = new URLSearchParams(location.search);
+    const group = params.get('group');
+    const tag = params.get('tag');
+
+    document.getElementById('tap').addEventListener('click', () => {
       if (++taps >= need) {
-        const u = new URL(app);
-        u.searchParams.set("group", group);
-        u.searchParams.set("tag", tag);
-        u.searchParams.set("bonus", "multiTap");
-        location.href = u.toString();
+        const tokenUrl = `/checkpoint/${encodeURIComponent(tag)}?group=${encodeURIComponent(group)}&bonus=multiTap`;
+        location.href = tokenUrl;
       }
-    };
+    });
   </script>
 </body>
 </html>
