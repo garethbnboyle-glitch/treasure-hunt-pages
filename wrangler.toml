@@ -3,11 +3,12 @@ compatibility_date = "2024-12-01"
 
 [vars]
 APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoPeHmGpSTOAu6tW0G6dpMBFaW8W14DS1F0Yn934UnjV1rr1QYMHxS0xMxUaXxc9MAMg/exec"
-BONUS_EXTRA_SCROLL = "1,14"
-BONUS_MULTI_TAP = "10,11"
+BONUS_EXTRA_SCROLL = "3,6"
+BONUS_MULTI_TAP = "4,12"
 
 [[kv_namespaces]]
 binding = "TOKENS"
 id = 788599a0a61c434ab300cc86a29bf358
 preview_id = 788599a0a61c434ab300cc86a29bf358
+
 
