@@ -9,17 +9,18 @@
 <body class="wrap center">
   <h2>Tap 3 times to claim bonus!</h2>
   <button id="tap" type="button" class="btn">Tap me</button>
+
   <script>
     let taps = 0;
     const need = 3;
     const params = new URLSearchParams(location.search);
     const group = params.get('group');
-    const tag = params.get('tag');
+    const token = params.get('tag'); // now 'tag' holds the token ID
 
     document.getElementById('tap').addEventListener('click', () => {
       if (++taps >= need) {
-        const tokenUrl = `/checkpoint/${encodeURIComponent(tag)}?group=${encodeURIComponent(group)}&bonus=multiTap`;
-        location.href = tokenUrl;
+        const returnUrl = `/checkpoint/${encodeURIComponent(token)}?group=${encodeURIComponent(group)}&bonus=multiTap`;
+        location.href = returnUrl;
       }
     });
   </script>
