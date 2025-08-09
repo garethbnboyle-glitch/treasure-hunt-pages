@@ -11,14 +11,17 @@
   <div style="height:2000px"></div>
   <a id="claim" class="btn">🎉 Claim Bonus</a>
   <script>
-    const p = new URLSearchParams(location.search);
-    const group = p.get('group'); const tag = p.get('tag');
-    const app = "{{APP_SCRIPT_URL}}"; // replace manually or via env
-    const url = new URL(app || "https://script.google.com/macros/s/AKfycbwoPeHmGpSTOAu6tW0G6dpMBFaW8W14DS1F0Yn934UnjV1rr1QYMHxS0xMxUaXxc9MAMg/exec");
-    url.searchParams.set("group", group);
-    url.searchParams.set("tag", tag);
-    url.searchParams.set("bonus", "scroll");
-    claim.onclick = () => location.href = url.toString();
+    const params = new URLSearchParams(location.search);
+    const group = params.get('group');
+    const tag = params.get('tag');
+
+    // Redirect back through token endpoint
+    const claimBtn = document.getElementById('claim');
+    claimBtn.addEventListener('click', () => {
+      // You could store token in query if you want a direct link
+      const tokenUrl = `/checkpoint/${encodeURIComponent(tag)}?group=${encodeURIComponent(group)}&bonus=scroll`;
+      location.href = tokenUrl;
+    });
   </script>
 </body>
 </html>
