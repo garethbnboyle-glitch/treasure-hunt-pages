@@ -17,9 +17,10 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 
   const { tag } = record;
 
-  // 2. Get group from URL
+  // 2. Get query params
   const urlObj = new URL(request.url);
   const group = urlObj.searchParams.get("group") || "UNKNOWN";
+  const bonusType = urlObj.searchParams.get("bonus") || "";
 
   // 3. Parse bonus tag arrays from env
   const bonusScroll = (env.BONUS_EXTRA_SCROLL || "")
@@ -32,23 +33,29 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     .map(n => parseInt(n.trim(), 10))
     .filter(n => !isNaN(n));
 
-  // 4. Bonus redirect logic
-  if (bonusScroll.includes(tag)) {
-    const bonusUrl = new URL(`/bonus/bonus1.html`, new URL(request.url).origin);
-    bonusUrl.searchParams.set("group", group);
-    bonusUrl.searchParams.set("tag", String(tag));
-    return Response.redirect(bonusUrl.toString(), 302);
-  }
-  if (bonusMultiTap.includes(tag)) {
-    const bonusUrl = new URL(`/bonus/bonus2.html`, new URL(request.url).origin);
-    bonusUrl.searchParams.set("group", group);
-    bonusUrl.searchParams.set("tag", String(tag));
-    return Response.redirect(bonusUrl.toString(), 302);
+  // 4. Handle bonus *trigger pages* (coming from normal tag scan)
+  if (!bonusType) {
+    if (bonusScroll.includes(tag)) {
+      const bonusUrl = new URL(`/bonus/bonus1.html`, new URL(request.url).origin);
+      bonusUrl.searchParams.set("group", group);
+      bonusUrl.searchParams.set("tag", String(token)); // pass token, not tag number
+      return Response.redirect(bonusUrl.toString(), 302);
+    }
+    if (bonusMultiTap.includes(tag)) {
+      const bonusUrl = new URL(`/bonus/bonus2.html`, new URL(request.url).origin);
+      bonusUrl.searchParams.set("group", group);
+      bonusUrl.searchParams.set("tag", String(token)); // pass token, not tag number
+      return Response.redirect(bonusUrl.toString(), 302);
+    }
   }
 
-  // 5. Normal tag → redirect to Google Apps Script
+  // 5. Normal or bonus *completion* → send to Apps Script
   const scriptUrl = new URL(env.APP_SCRIPT_URL);
   scriptUrl.searchParams.set("group", group);
   scriptUrl.searchParams.set("tag", String(tag));
+  if (bonusType) {
+    scriptUrl.searchParams.set("bonus", bonusType);
+  }
+
   return Response.redirect(scriptUrl.toString(), 302);
 };
