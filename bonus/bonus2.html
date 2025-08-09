@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Tap Bonus</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="wrap center">
+  <h2>Tap 3 times to claim bonus!</h2>
+  <button id="tap" class="btn">Tap me</button>
+  <script>
+    let taps = 0, need = 3;
+    const p = new URLSearchParams(location.search);
+    const group = p.get('group'); const tag = p.get('tag');
+    const app = "https://script.google.com/macros/s/AKfycbwoPeHmGpSTOAu6tW0G6dpMBFaW8W14DS1F0Yn934UnjV1rr1QYMHxS0xMxUaXxc9MAMg/exec";
+    tap.onclick = () => {
+      if (++taps >= need) {
+        const u = new URL(app);
+        u.searchParams.set("group", group);
+        u.searchParams.set("tag", tag);
+        u.searchParams.set("bonus", "multiTap");
+        location.href = u.toString();
+      }
+    };
+  </script>
+</body>
+</html>
