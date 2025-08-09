@@ -1,0 +1,12 @@
+name = "treasure-hunt-pages"
+compatibility_date = "2024-12-01"
+
+[vars]
+APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoPeHmGpSTOAu6tW0G6dpMBFaW8W14DS1F0Yn934UnjV1rr1QYMHxS0xMxUaXxc9MAMg/exec"
+BONUS_EXTRA_SCROLL = "1,14"
+BONUS_MULTI_TAP = "10,11"
+
+[[kv_namespaces]]
+binding = "TOKENS"
+id = "REPLACE_WITH_KV_ID"
+preview_id = "REPLACE_WITH_KV_ID"
