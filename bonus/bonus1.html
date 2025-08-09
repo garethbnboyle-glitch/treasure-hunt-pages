@@ -10,17 +10,15 @@
   <h2>Keep scrolling…</h2>
   <div style="height:2000px"></div>
   <a id="claim" class="btn">🎉 Claim Bonus</a>
+
   <script>
     const params = new URLSearchParams(location.search);
     const group = params.get('group');
-    const tag = params.get('tag');
+    const token = params.get('tag'); // now 'tag' holds the token ID
 
-    // Redirect back through token endpoint
-    const claimBtn = document.getElementById('claim');
-    claimBtn.addEventListener('click', () => {
-      // You could store token in query if you want a direct link
-      const tokenUrl = `/checkpoint/${encodeURIComponent(tag)}?group=${encodeURIComponent(group)}&bonus=scroll`;
-      location.href = tokenUrl;
+    document.getElementById('claim').addEventListener('click', () => {
+      const returnUrl = `/checkpoint/${encodeURIComponent(token)}?group=${encodeURIComponent(group)}&bonus=scroll`;
+      location.href = returnUrl;
     });
   </script>
 </body>
