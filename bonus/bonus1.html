@@ -11,15 +11,27 @@
   <div style="height:2000px"></div>
   <a id="claim" class="btn">🎉 Claim Bonus</a>
 
-  <script>
-    const params = new URLSearchParams(location.search);
-    const group = params.get('group');
-    const token = params.get('tag'); // now 'tag' holds the token ID
+<script>
+  const p = new URLSearchParams(location.search);
+  let group = p.get('group');
+  const tag = p.get('tag');
 
-    document.getElementById('claim').addEventListener('click', () => {
-      const returnUrl = `/checkpoint/${encodeURIComponent(token)}?group=${encodeURIComponent(group)}&bonus=scroll`;
-      location.href = returnUrl;
-    });
-  </script>
+  if (!group) {
+    group = localStorage.getItem('treasure_group');
+    if (!group) {
+      // Redirect to set group page, then return here
+      const returnUrl = location.pathname + location.search;
+      location.href = '/setgroup.html?return=' + encodeURIComponent(returnUrl);
+    }
+  }
+
+  const app = "{{APP_SCRIPT_URL}}"; // Replace or inject via env
+  const url = new URL(app || "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec");
+  url.searchParams.set("group", group);
+  url.searchParams.set("tag", tag);
+  url.searchParams.set("bonus", "scroll");
+
+  document.getElementById('claim').onclick = () => location.href = url.toString();
+</script>
 </body>
 </html>
