@@ -8,5 +8,6 @@ BONUS_MULTI_TAP = "10,11"
 
 [[kv_namespaces]]
 binding = "TOKENS"
-id = "REPLACE_WITH_KV_ID"
-preview_id = "REPLACE_WITH_KV_ID"
+id = 788599a0a61c434ab300cc86a29bf358
+preview_id = 788599a0a61c434ab300cc86a29bf358
+
