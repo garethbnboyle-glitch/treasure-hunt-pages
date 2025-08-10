@@ -1,9 +1,9 @@
 export interface Env {
   TOKENS: KVNamespace;                   // KV with token -> {"tag": number}
   BONUS_EXTRA_SCROLL?: string;           // e.g. "1,14"
-  BONUS_MULTI_TAP?: string;              // e.g. "10,11"
-  COOLDOWN_SECONDS?: string;             // e.g. "5"
-  BONUS_TTL_SECONDS?: string;            // e.g. "21600" (6h)
+  BONUS_MULTI_TAP?: string;               // e.g. "10,11"
+  COOLDOWN_SECONDS?: string;              // e.g. "5"
+  BONUS_TTL_SECONDS?: string;             // e.g. "21600" (6h)
 }
 
 export const onRequest: PagesFunction<Env> = async ({ params, env, request }) => {
@@ -24,7 +24,7 @@ export const onRequest: PagesFunction<Env> = async ({ params, env, request }) =>
   const bonusTtlSec = toInt(env.BONUS_TTL_SECONDS, 21600);
 
   // Load routes.json and links.json
-  const origin = new URL(request.url).origin;
+  const origin = reqUrl.origin;
   const [routes, links] = await Promise.all([
     fetch(`${origin}/data/routes.json`).then(r => r.json()),
     fetch(`${origin}/data/links.json`).then(r => r.json())
@@ -86,15 +86,33 @@ export const onRequest: PagesFunction<Env> = async ({ params, env, request }) =>
     }
   }
 
-  // 5) Route checking
+  // 5) Enforce correct route order
   const route = routes[group];
   const tagIndex = route.indexOf(tag);
   if (tagIndex === -1) {
     return html(400, simplePage("Tag Not in Route", `<p>Tag ${tag} is not part of ${group}’s route.</p>`));
   }
 
-  // 6) Get clue URL
-  const clueUrl = links[tag];
+  // Get last progress
+  const progKey = `PROGRESS:${group}`;
+  const lastIndexStr = await env.TOKENS.get(progKey);
+  const lastIndex = lastIndexStr ? parseInt(lastIndexStr, 10) : -1;
+
+  if (tagIndex !== lastIndex + 1) {
+    // Wrong tag scanned
+    const expectedTag = route[lastIndex + 1];
+    return html(400, simplePage("Out of Order", `
+      <p>⚠️ This is not the expected tag.</p>
+      <p>You should find Tag <strong>${expectedTag}</strong> next.</p>
+    `));
+  }
+
+  // Save new progress
+  await env.TOKENS.put(progKey, String(tagIndex));
+
+  // 6) Get clue URL (links.json is "clue1", "clue2", etc.)
+  const clueKey = `clue${tag}`;
+  const clueUrl = links[clueKey];
   if (!clueUrl) {
     return html(400, simplePage("Missing Clue", `<p>No clue found for tag ${tag}.</p>`));
   }
